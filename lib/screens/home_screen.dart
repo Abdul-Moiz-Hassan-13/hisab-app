@@ -15,8 +15,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late List<Animation<double>> _fadeAnims;
-  late List<Animation<Offset>> _slideAnims;
+  List<Animation<double>> _fadeAnims = [];
+  List<Animation<Offset>> _slideAnims = [];
 
   // State management for tracking
   final Map<String, int> _prayerCounts = {
@@ -76,8 +76,8 @@ class _HomeScreenState extends State<HomeScreen>
       duration: const Duration(milliseconds: 1400),
     );
 
-    // Staggered animations: title (0), subtitle (1), cards (2..5), button (6)
-    _fadeAnims = List.generate(7, (i) {
+    // Staggered animations: title (0), subtitle (1), section (2), cards (3-4), footer (5)
+    _fadeAnims = List.generate(6, (i) {
       final start = i * 0.10;
       final end = (start + 0.35).clamp(0.0, 1.0);
       return Tween<double>(begin: 0, end: 1).animate(
@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen>
       );
     });
 
-    _slideAnims = List.generate(7, (i) {
+    _slideAnims = List.generate(6, (i) {
       final start = i * 0.10;
       final end = (start + 0.35).clamp(0.0, 1.0);
       return Tween<Offset>(
@@ -218,8 +218,8 @@ class _HomeScreenState extends State<HomeScreen>
 
                   // Title
                   _AnimatedEntry(
-                    fade: _fadeAnims[1],
-                    slide: _slideAnims[1],
+                    fade: _fadeAnims[0],
+                    slide: _slideAnims[0],
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -251,8 +251,8 @@ class _HomeScreenState extends State<HomeScreen>
 
                   // Subtitle
                   _AnimatedEntry(
-                    fade: _fadeAnims[2],
-                    slide: _slideAnims[2],
+                    fade: _fadeAnims[1],
+                    slide: _slideAnims[1],
                     child: Text(
                       'Track your missed prayers, fasts,\nexpiations, and debts — all in one place.',
                       style: TextStyle(
@@ -268,8 +268,8 @@ class _HomeScreenState extends State<HomeScreen>
 
                   // Section label
                   _AnimatedEntry(
-                    fade: _fadeAnims[3],
-                    slide: _slideAnims[3],
+                    fade: _fadeAnims[2],
+                    slide: _slideAnims[2],
                     child: Text(
                       'What you can track',
                       style: TextStyle(
@@ -292,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen>
                     mainAxisSpacing: 14,
                     childAspectRatio: 1.0,
                     children: List.generate(_features.length, (i) {
-                      final animIndex = 4 + (i ~/ 2).clamp(0, 1);
+                      final animIndex = 3 + (i ~/ 2).clamp(0, 1);
                       return _AnimatedEntry(
                         fade: _fadeAnims[animIndex],
                         slide: _slideAnims[animIndex],
@@ -308,8 +308,8 @@ class _HomeScreenState extends State<HomeScreen>
 
                   // Subtle footer note
                   _AnimatedEntry(
-                    fade: _fadeAnims[6],
-                    slide: _slideAnims[6],
+                    fade: _fadeAnims[5],
+                    slide: _slideAnims[5],
                     child: Center(
                       child: Text(
                         'Your data stays private on your device.',
