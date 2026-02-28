@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/debt_entry.dart';
+import '../services/supabase_service.dart';
+import 'auth_screen.dart';
 import 'debt_screen.dart';
 import 'expiations_screen.dart';
 import 'fasts_screen.dart';
@@ -17,6 +19,8 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _controller;
   List<Animation<double>> _fadeAnims = [];
   List<Animation<Offset>> _slideAnims = [];
+  final SupabaseService _supabaseService = SupabaseService();
+  bool _isSyncing = false;
 
   // State management for tracking
   final Map<String, int> _prayerCounts = {
@@ -42,31 +46,31 @@ class _HomeScreenState extends State<HomeScreen>
 
   // Feature cards data
   List<_FeatureItem> get _features => [
-        _FeatureItem(
-          icon: Icons.self_improvement_rounded,
-          label: 'Missed Prayers',
-          color: const Color(0xFFB5835A),
-          count: '$_totalRemaining',
-        ),
-        _FeatureItem(
-          icon: Icons.no_meals_rounded,
-          label: 'Missed Fasts',
-          color: const Color(0xFF7A9E7E),
-          count: '$_fastCount',
-        ),
-        _FeatureItem(
-          icon: Icons.volunteer_activism_rounded,
-          label: 'Expiations',
-          color: const Color(0xFF6B8CAE),
-          count: '$_expiationsCount',
-        ),
-        _FeatureItem(
-          icon: Icons.account_balance_wallet_rounded,
-          label: 'Debt to Pay',
-          color: const Color(0xFFA0748A),
-          count: 'Rs ${_totalDebt.toStringAsFixed(0)}',
-        ),
-      ];
+    _FeatureItem(
+      icon: Icons.mosque,
+      label: 'Missed Prayers',
+      color: const Color(0xFFB5835A),
+      count: '$_totalRemaining',
+    ),
+    _FeatureItem(
+      icon: Icons.no_meals_rounded,
+      label: 'Missed Fasts',
+      color: const Color(0xFF7A9E7E),
+      count: '$_fastCount',
+    ),
+    _FeatureItem(
+      icon: Icons.volunteer_activism_rounded,
+      label: 'Expiations',
+      color: const Color(0xFF6B8CAE),
+      count: '$_expiationsCount',
+    ),
+    _FeatureItem(
+      icon: Icons.account_balance_wallet_rounded,
+      label: 'Debt to Pay',
+      color: const Color(0xFFA0748A),
+      count: 'Rs ${_totalDebt.toStringAsFixed(0)}',
+    ),
+  ];
 
   @override
   void initState() {
@@ -103,6 +107,7 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     _controller.forward();
+    _initializeCloudSync();
   }
 
   @override
@@ -126,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen>
               ..clear()
               ..addAll(result);
           });
+          await _supabaseService.savePrayers(_prayerCounts);
         }
         break;
       case 1: // Fasts
@@ -139,19 +145,22 @@ class _HomeScreenState extends State<HomeScreen>
           setState(() {
             _fastCount = result;
           });
+          await _supabaseService.saveFasts(_fastCount);
         }
         break;
       case 2: // Expiations
         final result = await Navigator.push<int?>(
           context,
           MaterialPageRoute(
-            builder: (context) => ExpiationsScreen(initialCount: _expiationsCount),
+            builder: (context) =>
+                ExpiationsScreen(initialCount: _expiationsCount),
           ),
         );
         if (result != null) {
           setState(() {
             _expiationsCount = result;
           });
+          await _supabaseService.saveExpiations(_expiationsCount);
         }
         break;
       case 3: // Debt
@@ -165,9 +174,35 @@ class _HomeScreenState extends State<HomeScreen>
           setState(() {
             _debts = result;
           });
+          await _supabaseService.saveDebts(_debts);
         }
         break;
     }
+  }
+
+  Future<void> _initializeCloudSync() async {
+    setState(() {
+      _isSyncing = true;
+    });
+
+    final prayers = await _supabaseService.getPrayers();
+    final fasts = await _supabaseService.getFasts();
+    final expiations = await _supabaseService.getExpiations();
+    final debts = await _supabaseService.getDebts();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _prayerCounts
+        ..clear()
+        ..addAll(prayers);
+      _fastCount = fasts;
+      _expiationsCount = expiations;
+      _debts = debts;
+      _isSyncing = false;
+    });
   }
 
   @override
@@ -179,6 +214,35 @@ class _HomeScreenState extends State<HomeScreen>
 
     return Scaffold(
       backgroundColor: bgColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: TextButton(
+              onPressed: () async {
+                await _supabaseService.signOut();
+                if (!mounted) return;
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const AuthScreen()),
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Logout',
+                    style: TextStyle(color: primaryText),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.logout, color: primaryText),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           // ── Decorative geometric background ──────────────────────
@@ -306,13 +370,19 @@ class _HomeScreenState extends State<HomeScreen>
 
                   const SizedBox(height: 20),
 
+                  if (_isSyncing)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+
                   // Subtle footer note
                   _AnimatedEntry(
                     fade: _fadeAnims[5],
                     slide: _slideAnims[5],
                     child: Center(
                       child: Text(
-                        'Your data stays private on your device.',
+                        'Your data is securely synced to the cloud.',
                         style: TextStyle(
                           fontSize: 12,
                           color: subtleText.withValues(alpha: 0.55),
@@ -414,7 +484,10 @@ class _FeatureCardState extends State<_FeatureCard> {
           decoration: BoxDecoration(
             color: _pressed ? color.withValues(alpha: 0.12) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: color.withValues(alpha: 0.15), width: 1.2),
+            border: Border.all(
+              color: color.withValues(alpha: 0.15),
+              width: 1.2,
+            ),
             boxShadow: [
               BoxShadow(
                 color: color.withValues(alpha: 0.08),

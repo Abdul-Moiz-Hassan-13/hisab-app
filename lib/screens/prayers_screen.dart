@@ -364,7 +364,7 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 isZero
-                    ? 'MashaAllah — nothing pending.'
+                    ? 'Ma Sha Allah, nothing pending.'
                     : 'Across all prayer types below.',
                 style: TextStyle(
                   fontSize: 12.5,
